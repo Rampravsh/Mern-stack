@@ -1,0 +1,15 @@
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Barriecito&family=Outfit:wght@100..900&display=swap");
+@import "tailwindcss";
+
+:root {
+  --font-Outfit: "Outfit", sans-serif;
+  --font-Barriecito: "Barriecito", cursive;
+}
+
+.font-barriecito-custom {
+  font-family: var(--font-Barriecito);
+}
+.font-outfit-custom {
+  font-family: var(--font-Outfit);
+}
