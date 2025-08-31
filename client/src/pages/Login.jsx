@@ -1,18 +1,53 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import { assets } from "../assets/assets";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { AppContext } from "../context/AppContext.jsx";
+import { toast } from "react-toastify";
+import axios from "axios";
 
 const Login = () => {
+  const { backendUrl, setToken } = useContext(AppContext);
+  const navigate = useNavigate();
+
   const [isLogin, setIsLogin] = useState(true);
   const [data, setData] = useState({
     name: "",
     email: "",
     password: "",
-    confirmPassword: "",
+    "confirm-password": "",
   });
 
   const onChangeHandler = (e) => {
     setData({ ...data, [e.target.name]: e.target.value });
+  };
+
+  const onAuthentication = async (e) => {
+    e.preventDefault();
+
+    let url = backendUrl;
+    if (isLogin) {
+      url += "/api/auth/login";
+    } else {
+      url += "/api/auth/register";
+    }
+
+    try {
+      const response = await axios.post(url, data);
+      if (response.data.success) {
+        setToken(response.data.token);
+        localStorage.setItem("token", response.data.token);
+        toast.success(response.data.message);
+        if (isLogin) {
+          navigate("/");
+        } else {
+          setIsLogin(true);
+        }
+      } else {
+        toast.error(response.data.message);
+      }
+    } catch (error) {
+      toast.error(error.response.data.message);
+    }
   };
 
   return (
@@ -69,7 +104,7 @@ const Login = () => {
           </div>
 
           {isLogin ? (
-            <form className="space-y-6">
+            <form className="space-y-6" onSubmit={onAuthentication}>
               <div>
                 <label
                   htmlFor="email"
@@ -91,6 +126,8 @@ const Login = () => {
                     type="email"
                     autoComplete="email"
                     required
+                    onChange={onChangeHandler}
+                    value={data.email}
                     className="appearance-none block w-full px-10 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                     placeholder="you@example.com"
                   />
@@ -118,6 +155,8 @@ const Login = () => {
                     type="password"
                     autoComplete="current-password"
                     required
+                    onChange={onChangeHandler}
+                    value={data.password}
                     className="appearance-none block w-full px-10 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                     placeholder="********"
                   />
@@ -160,7 +199,7 @@ const Login = () => {
               </div>
             </form>
           ) : (
-            <form className="space-y-6">
+            <form className="space-y-6" onSubmit={onAuthentication}>
               <div>
                 <label
                   htmlFor="name"
@@ -182,6 +221,8 @@ const Login = () => {
                     type="text"
                     autoComplete="name"
                     required
+                    onChange={onChangeHandler}
+                    value={data.name}
                     className="appearance-none block w-full px-10 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                     placeholder="Your Name"
                   />
@@ -208,6 +249,8 @@ const Login = () => {
                     type="email"
                     autoComplete="email"
                     required
+                    onChange={onChangeHandler}
+                    value={data.email}
                     className="appearance-none block w-full px-10 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                     placeholder="you@example.com"
                   />
@@ -235,6 +278,8 @@ const Login = () => {
                     type="password"
                     autoComplete="new-password"
                     required
+                    onChange={onChangeHandler}
+                    value={data.password}
                     className="appearance-none block w-full px-10 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                     placeholder="********"
                   />
@@ -262,6 +307,8 @@ const Login = () => {
                     type="password"
                     autoComplete="new-password"
                     required
+                    onChange={onChangeHandler}
+                    value={data["confirm-password"]}
                     className="appearance-none block w-full px-10 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                     placeholder="********"
                   />
