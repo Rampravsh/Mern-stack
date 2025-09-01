@@ -230,7 +230,7 @@ export const verifyOTPController = async (req, res, next) => {
 
   try {
     await verifyOTP(email, otp);
-    res.status(200).json({ message: "Email verified successfully" });
+    res.status(200).json({success: true, message: "Email verified successfully" });
   } catch (error) {
     next(error);
   }

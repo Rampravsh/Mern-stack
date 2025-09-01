@@ -5,54 +5,152 @@ import { AppContext } from "../context/AppContext.jsx";
 import { toast } from "react-toastify";
 import axios from "axios";
 
+// API endpoints can be managed in a central place.
+const API_ENDPOINTS = {
+  LOGIN: "/api/auth/login",
+  REGISTER: "/api/auth/register",
+};
+
+/**
+ * A reusable input component for the authentication form.
+ * In a larger app, this would be in its own file (e.g., /components/FormInput.jsx).
+ */
+const FormInput = ({
+  id,
+  name,
+  type,
+  autoComplete,
+  value,
+  onChange,
+  placeholder,
+  icon,
+  label,
+}) => (
+  <div>
+    <label htmlFor={id} className="text-sm font-medium text-gray-700">
+      {label}
+    </label>
+    <div className="mt-1 relative rounded-md shadow-sm">
+      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <img
+          src={icon}
+          alt={`${name} icon`}
+          className="w-5 h-5 text-gray-400"
+        />
+      </div>
+      <input
+        id={id}
+        name={name}
+        type={type}
+        autoComplete={autoComplete}
+        required
+        onChange={onChange}
+        value={value}
+        className="appearance-none block w-full px-10 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        placeholder={placeholder}
+      />
+    </div>
+  </div>
+);
+
 const Login = () => {
   const { backendUrl, setToken } = useContext(AppContext);
   const navigate = useNavigate();
 
+  // State to toggle between Login and Sign Up views
   const [isLogin, setIsLogin] = useState(true);
-  const [data, setData] = useState({
+
+  // State for form fields, using more descriptive name `formData`
+  const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
-    "confirm-password": "",
+    confirmPassword: "",
   });
 
+  /**
+   * Handles changes in form inputs and updates the state.
+   * @param {React.ChangeEvent<HTMLInputElement>} e - The event object.
+   */
   const onChangeHandler = (e) => {
-    setData({ ...data, [e.target.name]: e.target.value });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const onAuthentication = async (e) => {
+  /**
+   * Toggles the auth mode between Login and Sign Up and resets the form.
+   * @param {boolean} newIsLogin - The new mode to set.
+   */
+  const toggleAuthMode = (newIsLogin) => {
+    setIsLogin(newIsLogin);
+    // Reset form data when switching modes for a better UX
+    setFormData({
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    });
+  };
+
+  /**
+   * Handles the form submission for both login and registration.
+   * @param {React.FormEvent<HTMLFormElement>} e - The event object.
+   */
+  const handleAuthentication = async (e) => {
     e.preventDefault();
 
-    let url = backendUrl;
-    if (isLogin) {
-      url += "/api/auth/login";
-    } else {
-      url += "/api/auth/register";
+    // Client-side validation for password confirmation on registration
+    if (!isLogin && formData.password !== formData.confirmPassword) {
+      toast.error("Passwords do not match.");
+      return; // Stop the submission
     }
 
+    const url = `${backendUrl}${
+      isLogin ? API_ENDPOINTS.LOGIN : API_ENDPOINTS.REGISTER
+    }`;
+
+    // Prepare payload based on auth mode
+    const payload = isLogin
+      ? { email: formData.email, password: formData.password }
+      : {
+          username: formData.name,
+          email: formData.email,
+          password: formData.password,
+        };
+
     try {
-      const response = await axios.post(url, data);
+      const response = await axios.post(url, payload);
+
       if (response.data.success) {
         setToken(response.data.token);
         localStorage.setItem("token", response.data.token);
         toast.success(response.data.message);
+
         if (isLogin) {
           navigate("/");
         } else {
-          setIsLogin(true);
+          // After successful registration, navigate to the OTP verification page
+          navigate("/otp-verify", { state: { email: formData.email } });
         }
       } else {
-        toast.error(response.data.message);
+        toast.error(response.data.message || "An unknown error occurred.");
       }
     } catch (error) {
-      toast.error(error.response.data.message);
+      const errorData = error.response?.data;
+      if (errorData && errorData.verification === false) {
+        toast.error(errorData.message);
+        navigate("/otp-verify", { state: { email: formData.email } });
+      } else {
+        const errorMessage =
+          errorData?.message ||
+          "An unexpected error occurred. Please try again.";
+        toast.error(errorMessage);
+      }
     }
   };
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-100">
-      {/* Left Side: Information */}
+      {/* Left Side: Information Panel */}
       <div
         className={`hidden md:flex md:w-1/2 flex-col justify-center items-center bg-indigo-600 p-8 text-white text-center ${
           isLogin ? "md:order-2" : "md:order-1"
@@ -65,7 +163,7 @@ const Login = () => {
         </p>
       </div>
 
-      {/* Right Side: Form */}
+      {/* Right Side: Form Panel */}
       <div
         className={`w-full md:w-1/2 flex justify-center items-center p-8 ${
           isLogin ? "md:order-1" : "md:order-2"
@@ -84,9 +182,10 @@ const Login = () => {
             </p>
           </div>
 
+          {/* Auth Mode Toggle Buttons */}
           <div className="flex justify-center rounded-md shadow-sm">
             <button
-              onClick={() => setIsLogin(true)}
+              onClick={() => toggleAuthMode(true)}
               className={`w-full py-2 px-4 text-sm font-medium ${
                 isLogin ? "text-white bg-indigo-600" : "text-gray-700 bg-white"
               } border border-gray-300 rounded-l-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
@@ -94,7 +193,7 @@ const Login = () => {
               Login
             </button>
             <button
-              onClick={() => setIsLogin(false)}
+              onClick={() => toggleAuthMode(false)}
               className={`w-full py-2 px-4 text-sm font-medium ${
                 !isLogin ? "text-white bg-indigo-600" : "text-gray-700 bg-white"
               } border border-gray-300 rounded-r-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
@@ -103,66 +202,58 @@ const Login = () => {
             </button>
           </div>
 
-          {isLogin ? (
-            <form className="space-y-6" onSubmit={onAuthentication}>
-              <div>
-                <label
-                  htmlFor="email"
-                  className="text-sm font-medium text-gray-700"
-                >
-                  Email address
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <img
-                      src={assets.mail_icon}
-                      alt="mail icon"
-                      className="w-5 h-5 text-gray-400"
-                    />
-                  </div>
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    onChange={onChangeHandler}
-                    value={data.email}
-                    className="appearance-none block w-full px-10 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    placeholder="you@example.com"
-                  />
-                </div>
-              </div>
+          {/* Unified Authentication Form */}
+          <form className="space-y-6" onSubmit={handleAuthentication}>
+            {!isLogin && (
+              <FormInput
+                id="name"
+                name="name"
+                type="text"
+                autoComplete="name"
+                value={formData.name}
+                onChange={onChangeHandler}
+                placeholder="Your Name"
+                icon={assets.person_icon}
+                label="Full Name"
+              />
+            )}
+            <FormInput
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              value={formData.email}
+              onChange={onChangeHandler}
+              placeholder="you@example.com"
+              icon={assets.mail_icon}
+              label="Email address"
+            />
+            <FormInput
+              id="password"
+              name="password"
+              type="password"
+              autoComplete={isLogin ? "current-password" : "new-password"}
+              value={formData.password}
+              onChange={onChangeHandler}
+              placeholder="********"
+              icon={assets.lock_icon}
+              label="Password"
+            />
+            {!isLogin && (
+              <FormInput
+                id="confirm-password"
+                name="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                value={formData.confirmPassword}
+                onChange={onChangeHandler}
+                placeholder="********"
+                icon={assets.lock_icon}
+                label="Confirm Password"
+              />
+            )}
 
-              <div>
-                <label
-                  htmlFor="password"
-                  className="text-sm font-medium text-gray-700"
-                >
-                  Password
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <img
-                      src={assets.lock_icon}
-                      alt="lock icon"
-                      className="w-5 h-5 text-gray-400"
-                    />
-                  </div>
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    autoComplete="current-password"
-                    required
-                    onChange={onChangeHandler}
-                    value={data.password}
-                    className="appearance-none block w-full px-10 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    placeholder="********"
-                  />
-                </div>
-              </div>
-
+            {isLogin && (
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <input
@@ -178,7 +269,6 @@ const Login = () => {
                     Remember me
                   </label>
                 </div>
-
                 <div className="text-sm">
                   <Link
                     to="/reset-password"
@@ -188,148 +278,22 @@ const Login = () => {
                   </Link>
                 </div>
               </div>
+            )}
 
-              <div>
-                <button
-                  type="submit"
-                  className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  Sign in
-                </button>
-              </div>
-            </form>
-          ) : (
-            <form className="space-y-6" onSubmit={onAuthentication}>
-              <div>
-                <label
-                  htmlFor="name"
-                  className="text-sm font-medium text-gray-700"
-                >
-                  Full Name
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <img
-                      src={assets.person_icon}
-                      alt="person icon"
-                      className="w-5 h-5 text-gray-400"
-                    />
-                  </div>
-                  <input
-                    id="name"
-                    name="name"
-                    type="text"
-                    autoComplete="name"
-                    required
-                    onChange={onChangeHandler}
-                    value={data.name}
-                    className="appearance-none block w-full px-10 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    placeholder="Your Name"
-                  />
-                </div>
-              </div>
-              <div>
-                <label
-                  htmlFor="email"
-                  className="text-sm font-medium text-gray-700"
-                >
-                  Email address
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <img
-                      src={assets.mail_icon}
-                      alt="mail icon"
-                      className="w-5 h-5 text-gray-400"
-                    />
-                  </div>
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    onChange={onChangeHandler}
-                    value={data.email}
-                    className="appearance-none block w-full px-10 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    placeholder="you@example.com"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="password"
-                  className="text-sm font-medium text-gray-700"
-                >
-                  Password
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <img
-                      src={assets.lock_icon}
-                      alt="lock icon"
-                      className="w-5 h-5 text-gray-400"
-                    />
-                  </div>
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    autoComplete="new-password"
-                    required
-                    onChange={onChangeHandler}
-                    value={data.password}
-                    className="appearance-none block w-full px-10 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    placeholder="********"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="confirm-password"
-                  className="text-sm font-medium text-gray-700"
-                >
-                  Confirm Password
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <img
-                      src={assets.lock_icon}
-                      alt="lock icon"
-                      className="w-5 h-5 text-gray-400"
-                    />
-                  </div>
-                  <input
-                    id="confirm-password"
-                    name="confirm-password"
-                    type="password"
-                    autoComplete="new-password"
-                    required
-                    onChange={onChangeHandler}
-                    value={data["confirm-password"]}
-                    className="appearance-none block w-full px-10 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    placeholder="********"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <button
-                  type="submit"
-                  className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  Sign up
-                </button>
-              </div>
-            </form>
-          )}
+            <div>
+              <button
+                type="submit"
+                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                {isLogin ? "Sign in" : "Sign up"}
+              </button>
+            </div>
+          </form>
 
           <p className="mt-2 text-center text-sm text-gray-600">
             {isLogin ? "Don't have an account? " : "Already have an account? "}
             <button
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => toggleAuthMode(!isLogin)}
               className="font-medium text-indigo-600 hover:text-indigo-500"
             >
               {isLogin ? "Sign up" : "Sign in"}
